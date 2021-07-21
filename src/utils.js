@@ -9,7 +9,7 @@ const END_POINT = "https://jsonplaceholder.typicode.com";
  */
 async function get(path) {
   const response = await axios.get(END_POINT + path);
-  return response;
+  return response.data;
 }
 
 module.exports = { get };
