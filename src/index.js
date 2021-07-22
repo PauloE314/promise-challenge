@@ -75,7 +75,7 @@ if (require.main === module) {
       post.user = users.find(({ id }) => id === post.userId);
     });
 
-    console.log(users);
+    console.log(posts);
   })();
 }
 
