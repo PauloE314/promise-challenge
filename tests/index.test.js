@@ -1,61 +1,147 @@
+const axios = require("axios");
+const AxiosMockAdapter = require("axios-mock-adapter");
 const { loadPostUsers, loadPosts } = require("../src/index.js");
-const {
-  testPostShape,
-  testCommentShape,
-  testUserShape,
-} = require("./common.js");
+const { fakePosts, fakeComments, fakeUsers } = require("./common.js");
 
-jest.setTimeout(300000);
+function getRegexNumbers(url, regex) {
+  const [_, ...values] = url.match(regex);
+  return values.map((value) => Number(value));
+}
+
+let mock = new AxiosMockAdapter(axios);
 
 describe("'loadPosts' function tests", () => {
-  function testPostListShape(posts) {
-    posts.forEach((post) => {
-      testPostShape(post);
+  const postsRegex = /^\/posts\/?\?_page=(\d+)&_limit=(\d+)/;
+  const commentsRegex = /^\/posts\/(\d+)\/comments/;
 
-      expect(post.comments).toBeInstanceOf(Array);
-      post.comments.forEach((comment) => testCommentShape(comment));
+  afterEach(() => mock.resetHistory());
+  beforeAll(() => {
+    // Mocks 'posts' behaviour
+    mock.onGet(postsRegex).reply((config) => {
+      const [_, limit] = getRegexNumbers(config.url, postsRegex);
+      const response = [];
+
+      for (let index = 0; index < limit; index++) {
+        const randomIndex = Math.floor(Math.random() * fakePosts.length);
+        response.push(fakePosts[randomIndex]);
+      }
+
+      return [200, response];
     });
-  }
 
-  it("Should return 10 posts", async () => {
-    const response = await loadPosts(10, 10);
+    // Mocks 'comments' behaviour
+    mock.onGet(commentsRegex).reply((config) => {
+      const [id] = getRegexNumbers(config.url, commentsRegex);
 
-    expect(response.length).toBe(10);
-    expect(response).toBeInstanceOf(Array);
-
-    testPostListShape(response);
+      const comments = fakeComments.filter(({ postId }) => postId === id);
+      return [200, comments];
+    });
   });
 
-  it("Should return 20 posts", async () => {
-    const response = await loadPosts(20, 10);
+  it("Should return correct shape posts", async () => {
+    const response = await loadPosts(30, 10);
 
-    expect(response.length).toBe(20);
+    response.forEach((post) => {
+      expect(post).toMatchObject({
+        userId: expect.any(Number),
+        id: expect.any(Number),
+        title: expect.any(String),
+        body: expect.any(String),
+        comments: expect.any(Array),
+      });
+
+      post.comments.forEach((comment) => {
+        expect(comment).toMatchObject({
+          id: expect.any(Number),
+          postId: post.id,
+          name: expect.any(String),
+          email: expect.any(String),
+          body: expect.any(String),
+        });
+      });
+    });
+  });
+
+  it("Should call 'get' function to load posts with correct data", async () => {
+    const total = 30;
+    const perPage = 10;
+
+    const response = await loadPosts(total, perPage);
+
+    const postGets = mock.history.get.filter((request) =>
+      request.url.match(postsRegex)
+    );
+    const commentGets = mock.history.get.filter((request) =>
+      request.url.match(commentsRegex)
+    );
+
     expect(response).toBeInstanceOf(Array);
+    expect(response.length).toBe(total);
+    expect(postGets.length).toBe(Math.ceil(total / perPage));
+    expect(mock.history.get.length).toBe(postGets.length + commentGets.length);
 
-    testPostListShape(response);
+    postGets.forEach((request, index) => {
+      const [page, limit] = getRegexNumbers(request.url, postsRegex);
+
+      expect(limit).toBe(perPage);
+      expect(page).toBe(index + 1);
+    });
+
+    commentGets.forEach((request) => {
+      const [postId] = getRegexNumbers(request.url, commentsRegex);
+      const correspondingPost = fakePosts.find(({ id }) => id === postId);
+
+      expect(correspondingPost).not.toBeUndefined();
+    });
   });
 });
 
 describe("'loadPostUsers' function tests", () => {
-  it("Should return correct users", async () => {
-    const fakePosts = [{ userId: 1 }, { userId: 2 }, { userId: 3 }];
-    const response = await loadPostUsers(fakePosts);
+  const userRegex = /^\/users\/(\d+)/;
+
+  afterEach(() => mock.resetHistory());
+  beforeAll(() => {
+    mock.reset();
+    mock.onGet(userRegex).reply((config) => {
+      const [userId] = getRegexNumbers(config.url, userRegex);
+      return [200, fakeUsers.find(({ id }) => userId === id)];
+    });
+  });
+
+  it("Should return correct users with correct shape", async () => {
+    const fakePostList = [{ userId: 1 }, { userId: 2 }, { userId: 3 }];
+
+    const response = await loadPostUsers(fakePostList);
 
     expect(response).toBeInstanceOf(Array);
-    expect(response.length).toBe(3);
+    expect(response.length).toBe(fakePostList.length);
+    expect(mock.history.get.length).toBe(fakePostList.length);
+
     response.forEach((user, index) => {
-      testUserShape(user);
-      expect(user.id).toBe(fakePosts[index].userId);
+      expect(user).toMatchObject({
+        id: expect.any(Number),
+        name: expect.any(String),
+        username: expect.any(String),
+        email: expect.any(String),
+        address: expect.any(Object),
+        phone: expect.any(String),
+        website: expect.any(String),
+        company: expect.any(Object),
+      });
+
+      expect(mock.history.get[index].url).toBe(`/users/${user.id}`);
     });
   });
 
   it("Should prevent duplicated users", async () => {
     const fakePosts = [{ userId: 1 }, { userId: 1 }, { userId: 1 }];
+    const userExpected = fakeUsers.find((user) => user.id === 1);
+
     const response = await loadPostUsers(fakePosts);
 
     expect(response).toBeInstanceOf(Array);
     expect(response.length).toBe(1);
-    testUserShape(response[0]);
-    expect(response[0].id).toBe(1);
+    expect(mock.history.get.length).toBe(1);
+    expect(response[0]).toEqual(userExpected);
   });
 });

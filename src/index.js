@@ -21,7 +21,7 @@ async function loadPosts(totalAmount, amountPerPage) {
     // Loads 20 posts (or less)
     const postList = await get(`/posts?_page=${page}&_limit=${amount}`);
 
-    // Creates an array of post comments
+    // // Creates an array of post comments
     const postCommentsPromise = postList.map((post) => {
       post.comments = [];
       return get(`/posts/${post.id}/comments`);
