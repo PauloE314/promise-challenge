@@ -49,7 +49,6 @@ async function loadPosts(totalAmount, amountPerPage) {
  * @returns Promise<Array>
  */
 async function loadPostsComments(posts) {
-  // Creates an array of post comments
   const postCommentsPromise = posts.map((post) => {
     post.comments = [];
     return get(`/posts/${post.id}/comments`);

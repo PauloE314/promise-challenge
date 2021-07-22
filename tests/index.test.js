@@ -111,8 +111,6 @@ describe("loadPosts", () => {
       expect(url).toBe(expectedUrl);
     });
   });
-
-  // Calls 'loadComments' function
 });
 
 describe("loadPostsUsers", () => {
