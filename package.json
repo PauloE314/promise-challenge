@@ -13,7 +13,9 @@
     "axios": "^0.21.1"
   },
   "devDependencies": {
+    "@types/axios-mock-adapter": "^1.10.0",
     "@types/jest": "^26.0.24",
+    "axios-mock-adapter": "^1.19.0",
     "jest": "^27.0.6"
   }
 }
