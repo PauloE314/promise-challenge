@@ -1,52 +1,22 @@
 const axios = require("axios");
 const AxiosMockAdapter = require("axios-mock-adapter");
 const { get } = require("../src/utils.js");
-const { fakeComments, fakePosts, fakeUsers } = require("./common");
 
-describe("'get' function tests", () => {
+describe("'get", () => {
   let mock = new AxiosMockAdapter(axios);
 
   afterEach(() => mock.resetHistory());
+  beforeAll(() => mock.onAny().reply(() => [200, {}]));
 
-  it("Should return a correct post list", async () => {
-    const limit = 20;
-    const expected = fakePosts.slice(0, limit);
-    const query = `/posts/?_page=1&_limit=${limit}`;
-
-    mock.onGet(query).replyOnce(() => [200, expected]);
-
-    const response = await get(query);
-
+  it("Calls 'axios.get' function", async () => {
+    await get();
     expect(mock.history.get.length).toBe(1);
-    expect(response).toBeInstanceOf(Array);
-    expect(response.length).toBeLessThanOrEqual(limit);
-    expect(response).toEqual(expected);
   });
 
-  it("Should return correct user data", async () => {
-    const userId = 1;
-    const expected = fakeUsers.find(({ id }) => userId === id) || {};
-    const query = `/users/${userId}`;
+  it("Calls 'axios.get' with expected parameters", async () => {
+    const url = "/my-random-string";
 
-    mock.onGet(query).replyOnce(() => [200, expected]);
-
-    const response = await get(query);
-
-    expect(mock.history.get.length).toBe(1);
-    expect(response).toEqual(expected);
-  });
-
-  it("Should return correct comments data", async () => {
-    const fakePostId = 1;
-    const expected = fakeComments.filter(({ postId }) => fakePostId === postId);
-    const query = `/posts/${fakePostId}/comments`;
-
-    mock.onGet(query).replyOnce(() => [200, expected]);
-
-    const response = await get(query);
-
-    expect(mock.history.get.length).toBe(1);
-    expect(response).toBeInstanceOf(Array);
-    expect(response).toEqual(expected);
+    await get(url);
+    expect(mock.history.get[0].url).toBe(url);
   });
 });

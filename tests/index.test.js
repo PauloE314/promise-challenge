@@ -1,7 +1,15 @@
 const axios = require("axios");
 const AxiosMockAdapter = require("axios-mock-adapter");
-const { loadPostUsers, loadPosts } = require("../src/index.js");
+const {
+  loadPostsUsers,
+  loadPosts,
+  loadPostsComments,
+} = require("../src/index.js");
 const { fakePosts, fakeComments, fakeUsers } = require("./common.js");
+
+const postsRegex = /^\/posts\/?\?_page=(\d+)&_limit=(\d+)/;
+const userRegex = /^\/users\/(\d+)/;
+const commentsRegex = /^\/posts\/(\d+)\/comments/;
 
 function getRegexNumbers(url, regex) {
   const [_, ...values] = url.match(regex);
@@ -10,100 +18,133 @@ function getRegexNumbers(url, regex) {
 
 let mock = new AxiosMockAdapter(axios);
 
-describe("'loadPosts' function tests", () => {
-  const postsRegex = /^\/posts\/?\?_page=(\d+)&_limit=(\d+)/;
-  const commentsRegex = /^\/posts\/(\d+)\/comments/;
+/**
+ * Aux function that resets the axios mock implementation
+ */
+function resetMock() {
+  mock.reset();
 
-  afterEach(() => mock.resetHistory());
-  beforeAll(() => {
-    // Mocks 'posts' behaviour
-    mock.onGet(postsRegex).reply((config) => {
-      const [_, limit] = getRegexNumbers(config.url, postsRegex);
-      const response = [];
+  mock.onGet(postsRegex).reply((config) => {
+    const [_, limit] = getRegexNumbers(config.url, postsRegex);
+    const response = [];
 
-      for (let index = 0; index < limit; index++) {
-        const randomIndex = Math.floor(Math.random() * fakePosts.length);
-        response.push(fakePosts[randomIndex]);
-      }
+    for (let index = 0; index < limit; index++) {
+      const randomIndex = Math.floor(Math.random() * fakePosts.length);
+      response.push(fakePosts[randomIndex]);
+    }
 
-      return [200, response];
-    });
-
-    // Mocks 'comments' behaviour
-    mock.onGet(commentsRegex).reply((config) => {
-      const [id] = getRegexNumbers(config.url, commentsRegex);
-
-      const comments = fakeComments.filter(({ postId }) => postId === id);
-      return [200, comments];
-    });
+    return [200, response];
   });
 
-  it("Should call 'get' function to load posts with correct data", async () => {
-    const total = 30;
-    const perPage = 10;
+  mock.onGet(commentsRegex).reply((config) => {
+    const [id] = getRegexNumbers(config.url, commentsRegex);
 
-    const response = await loadPosts(total, perPage);
-    const postGets = mock.history.get.filter((request) =>
-      request.url.match(postsRegex)
-    );
-    const commentGets = mock.history.get.filter((request) =>
-      request.url.match(commentsRegex)
-    );
+    const comments = fakeComments.filter(({ postId }) => postId === id);
+    return [200, comments];
+  });
 
-    expect(response).toBeInstanceOf(Array);
-    expect(response.length).toBe(total);
-    expect(postGets.length).toBe(Math.ceil(total / perPage));
-    expect(mock.history.get.length).toBe(postGets.length + commentGets.length);
+  mock.onGet(userRegex).reply((config) => {
+    const [userId] = getRegexNumbers(config.url, userRegex);
+    return [200, fakeUsers.find(({ id }) => userId === id)];
+  });
+}
 
-    postGets.forEach((request, index) => {
-      const [page, limit] = getRegexNumbers(request.url, postsRegex);
+describe("loadPostsComments", () => {
+  beforeAll(resetMock);
+  afterEach(() => mock.resetHistory());
 
-      expect(limit).toBe(perPage);
-      expect(page).toBe(index + 1);
-    });
+  it("Returns all comments in a post list", async () => {
+    const comments = await loadPostsComments(fakePosts);
+    expect(comments).toBeInstanceOf(Array);
+  });
 
-    commentGets.forEach((request) => {
-      const [postId] = getRegexNumbers(request.url, commentsRegex);
-      const correspondingPost = fakePosts.find(({ id }) => id === postId);
+  it("Calls 'get' function in each comment load", async () => {
+    const comments = await loadPostsComments(fakePosts);
+    expect(mock.history.get.length).toBe(comments.length);
+  });
 
-      expect(correspondingPost).not.toBeUndefined();
+  it("Calls 'get' function with correct url", async () => {
+    await loadPostsComments(fakePosts);
+
+    mock.history.get.forEach(({ url }) => {
+      const urlMatch = url.match(commentsRegex);
+      expect(urlMatch).not.toBeNull();
     });
   });
 });
 
-describe("'loadPostUsers' function tests", () => {
-  const userRegex = /^\/users\/(\d+)/;
+describe("loadPosts", () => {
+  const total = 40;
+  const perPage = 20;
 
+  beforeAll(resetMock);
   afterEach(() => mock.resetHistory());
-  beforeAll(() => {
-    mock.reset();
-    mock.onGet(userRegex).reply((config) => {
-      const [userId] = getRegexNumbers(config.url, userRegex);
-      return [200, fakeUsers.find(({ id }) => userId === id)];
+
+  it("Returns post list", async () => {
+    const postList = await loadPosts(total, perPage);
+    expect(postList).toBeInstanceOf(Array);
+  });
+
+  it("Returns a list with 'total' size", async () => {
+    const postList = await loadPosts(total, perPage);
+    expect(postList.length).toBe(total);
+  });
+
+  it("Calls 'get' function to load every 20 posts", async () => {
+    await loadPosts(total, perPage);
+
+    const postGets = mock.history.get.filter((request) =>
+      request.url.match(postsRegex)
+    );
+    expect(postGets.length).toBe(Math.ceil(total / perPage));
+  });
+
+  it("Calls 'get' function with correct url", async () => {
+    await loadPosts(total, perPage);
+
+    const requestHistoric = mock.history.get.filter((request) =>
+      request.url.match(postsRegex)
+    );
+
+    requestHistoric.forEach(({ url }, index) => {
+      const expectedUrl = `/posts?_page=${index + 1}&_limit=${perPage}`;
+      expect(url).toBe(expectedUrl);
     });
   });
 
-  it("Should return the user list", async () => {
-    const fakePostList = [{ userId: 1 }, { userId: 2 }, { userId: 3 }];
+  // Calls 'loadComments' function
+});
 
-    const response = await loadPostUsers(fakePostList);
+describe("loadPostsUsers", () => {
+  const fakePostList = [{ userId: 1 }, { userId: 2 }, { userId: 3 }];
 
-    expect(response.length).toBe(fakePostList.length);
+  beforeAll(resetMock);
+  afterEach(() => mock.resetHistory());
+
+  it("Return a user list", async () => {
+    const userList = await loadPostsUsers(fakePostList);
+    expect(userList).toBeInstanceOf(Array);
+  });
+
+  it("Calls 'get' function to load each user", async () => {
+    await loadPostsUsers(fakePostList);
     expect(mock.history.get.length).toBe(fakePostList.length);
-
-    response.forEach((user, index) => {
-      expect(mock.history.get[index].url).toBe(`/users/${user.id}`);
-    });
   });
 
-  it("Should prevent duplicated users", async () => {
+  it("Calls 'get' function with expected urls", async () => {
+    await loadPostsUsers(fakePostList);
+
+    const expectedUrlHistoric = fakePostList.map(
+      ({ userId }) => `/users/${userId}`
+    );
+    const urlHistoric = mock.history.get.map(({ url }) => url);
+
+    expect(urlHistoric).toEqual(expectedUrlHistoric);
+  });
+
+  it("Prevents duplicated users", async () => {
     const fakePosts = [{ userId: 1 }, { userId: 1 }, { userId: 1 }];
-    const userExpected = fakeUsers.find((user) => user.id === 1);
-
-    const response = await loadPostUsers(fakePosts);
-
-    expect(response.length).toBe(1);
-    expect(mock.history.get.length).toBe(1);
-    expect(response[0]).toEqual(userExpected);
+    const userList = await loadPostsUsers(fakePosts);
+    expect(userList.length).toBe(1);
   });
 });

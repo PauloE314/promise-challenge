@@ -1,7 +1,7 @@
 const END_POINT = "https://jsonplaceholder.typicode.com";
 
 const axios = require("axios");
-axios.default.baseURL = END_POINT;
+axios.defaults.baseURL = END_POINT;
 
 /**
  * Makes a get request to the END_POINT

@@ -21,14 +21,8 @@ async function loadPosts(totalAmount, amountPerPage) {
     // Loads 20 posts (or less)
     const postList = await get(`/posts?_page=${page}&_limit=${amount}`);
 
-    // // Creates an array of post comments
-    const postCommentsPromise = postList.map((post) => {
-      post.comments = [];
-      return get(`/posts/${post.id}/comments`);
-    });
-
-    // Loads all comments in parallel
-    const postComments = await Promise.all(postCommentsPromise);
+    // Loads post comments
+    const postComments = await loadPostsComments(postList);
 
     // Stores comment lists in posts
     postComments.forEach((commentList) => {
@@ -50,10 +44,27 @@ async function loadPosts(totalAmount, amountPerPage) {
 }
 
 /**
+ * Loads all comments in a certain post
+ * @param {Array} posts
+ * @returns Promise<Array>
+ */
+async function loadPostsComments(posts) {
+  // Creates an array of post comments
+  const postCommentsPromise = posts.map((post) => {
+    post.comments = [];
+    return get(`/posts/${post.id}/comments`);
+  });
+
+  // Loads all comments in parallel and returns
+  return await Promise.all(postCommentsPromise);
+}
+
+/**
  * Loads all users that have written a post
  * @param {Array} posts
+ * @returns Promise<Array>
  */
-async function loadPostUsers(posts) {
+async function loadPostsUsers(posts) {
   const userIdSet = new Set();
 
   posts.forEach(({ userId }) => userIdSet.add(userId));
@@ -69,17 +80,16 @@ async function loadPostUsers(posts) {
 if (require.main === module) {
   (async () => {
     const posts = await loadPosts(POST_AMOUNT, POST_AMOUNT_PER_REQUEST);
-    const users = await loadPostUsers(posts);
+    const users = await loadPostsUsers(posts);
 
     posts.forEach((post) => {
       post.user = users.find(({ id }) => id === post.userId);
     });
-
-    console.log(posts);
   })();
 }
 
 module.exports = {
-  loadPostUsers,
+  loadPostsUsers,
   loadPosts,
+  loadPostsComments,
 };
