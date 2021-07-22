@@ -38,36 +38,11 @@ describe("'loadPosts' function tests", () => {
     });
   });
 
-  it("Should return correct shape posts", async () => {
-    const response = await loadPosts(30, 10);
-
-    response.forEach((post) => {
-      expect(post).toMatchObject({
-        userId: expect.any(Number),
-        id: expect.any(Number),
-        title: expect.any(String),
-        body: expect.any(String),
-        comments: expect.any(Array),
-      });
-
-      post.comments.forEach((comment) => {
-        expect(comment).toMatchObject({
-          id: expect.any(Number),
-          postId: post.id,
-          name: expect.any(String),
-          email: expect.any(String),
-          body: expect.any(String),
-        });
-      });
-    });
-  });
-
   it("Should call 'get' function to load posts with correct data", async () => {
     const total = 30;
     const perPage = 10;
 
     const response = await loadPosts(total, perPage);
-
     const postGets = mock.history.get.filter((request) =>
       request.url.match(postsRegex)
     );
@@ -108,27 +83,15 @@ describe("'loadPostUsers' function tests", () => {
     });
   });
 
-  it("Should return correct users with correct shape", async () => {
+  it("Should return the user list", async () => {
     const fakePostList = [{ userId: 1 }, { userId: 2 }, { userId: 3 }];
 
     const response = await loadPostUsers(fakePostList);
 
-    expect(response).toBeInstanceOf(Array);
     expect(response.length).toBe(fakePostList.length);
     expect(mock.history.get.length).toBe(fakePostList.length);
 
     response.forEach((user, index) => {
-      expect(user).toMatchObject({
-        id: expect.any(Number),
-        name: expect.any(String),
-        username: expect.any(String),
-        email: expect.any(String),
-        address: expect.any(Object),
-        phone: expect.any(String),
-        website: expect.any(String),
-        company: expect.any(Object),
-      });
-
       expect(mock.history.get[index].url).toBe(`/users/${user.id}`);
     });
   });
@@ -139,7 +102,6 @@ describe("'loadPostUsers' function tests", () => {
 
     const response = await loadPostUsers(fakePosts);
 
-    expect(response).toBeInstanceOf(Array);
     expect(response.length).toBe(1);
     expect(mock.history.get.length).toBe(1);
     expect(response[0]).toEqual(userExpected);
