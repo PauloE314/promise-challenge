@@ -1,6 +1,7 @@
-const axios = require("axios");
-
 const END_POINT = "https://jsonplaceholder.typicode.com";
+
+const axios = require("axios");
+axios.default.baseURL = END_POINT;
 
 /**
  * Makes a get request to the END_POINT
@@ -8,7 +9,7 @@ const END_POINT = "https://jsonplaceholder.typicode.com";
  * @returns {Promise}
  */
 async function get(path) {
-  const response = await axios.get(END_POINT + path);
+  const response = await axios.get(path);
   return response.data;
 }
 
