@@ -1,7 +1,7 @@
 const { get } = require("./utils");
 
 const POST_AMOUNT_PER_REQUEST = 20;
-const POST_AMOUNT = 20;
+const POST_AMOUNT = 115;
 
 /**
  * Loads a post set
@@ -43,7 +43,7 @@ async function loadPosts(totalAmount, amountPerPage) {
     posts.push(...postList);
 
     page++;
-    remaining -= postList.lenght;
+    remaining -= postList.length;
   }
 
   return posts;
@@ -65,27 +65,21 @@ async function loadPostUsers(posts) {
   return users;
 }
 
-/**
- * CHANLLENGE MAIN FUNCTION
- */
-async function main() {
-  const posts = await loadPosts(POST_AMOUNT, POST_AMOUNT_PER_REQUEST);
-  const users = await loadPostUsers(posts);
-
-  posts.forEach((post) => {
-    post.user = users.find(({ id }) => id === post.userId);
-  });
-
-  return posts;
-}
-
-// Runs main function
+// Runs application
 if (require.main === module) {
-  main().then((response) => console.log(response));
+  (async () => {
+    const posts = await loadPosts(POST_AMOUNT, POST_AMOUNT_PER_REQUEST);
+    const users = await loadPostUsers(posts);
+
+    posts.forEach((post) => {
+      post.user = users.find(({ id }) => id === post.userId);
+    });
+
+    console.log(users);
+  })();
 }
 
 module.exports = {
   loadPostUsers,
   loadPosts,
-  main,
 };
